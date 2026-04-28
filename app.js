@@ -26,6 +26,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(sessionMiddleware);
 
+// Payment routes (before API routes to avoid 404 handler conflicts)
+app.use('/payment', require('./src/routes/paymentRoutes'));
+
 // API Routes
 app.use('/api/auth', require('./src/routes/authRoutes'));
 app.use('/api/admin/products', require('./src/routes/adminProductRoutes'));

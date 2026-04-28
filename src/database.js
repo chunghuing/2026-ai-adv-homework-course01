@@ -163,6 +163,13 @@ function seedProducts() {
   insertMany(seedProducts);
 }
 
+function runMigrations() {
+  // ECPay columns: SQLite does not support IF NOT EXISTS for ALTER TABLE
+  try { db.exec('ALTER TABLE orders ADD COLUMN merchant_trade_no TEXT'); } catch (_) {}
+  try { db.exec('ALTER TABLE orders ADD COLUMN ecpay_trade_no TEXT'); } catch (_) {}
+}
+
 initializeDatabase();
+runMigrations();
 
 module.exports = db;

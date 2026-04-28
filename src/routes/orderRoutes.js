@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database');
 const authMiddleware = require('../middleware/authMiddleware');
+const ecpay = require('../services/ecpay');
 
 const router = express.Router();
 
@@ -133,13 +134,16 @@ router.post('/', (req, res) => {
 
   const orderId = uuidv4();
   const orderNo = generateOrderNo();
+  const ts = Math.floor(Date.now() / 1000).toString();
+  const rand = Math.random().toString(36).substring(2, 9).toUpperCase();
+  const merchantTradeNo = 'FLR' + ts + rand; // 3+10+7 = 20 chars, alphanumeric
 
   // Transaction: create order, order items, deduct stock, clear cart
   const createOrder = db.transaction(() => {
     db.prepare(
-      `INSERT INTO orders (id, order_no, user_id, recipient_name, recipient_email, recipient_address, total_amount)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(orderId, orderNo, userId, recipientName, recipientEmail, recipientAddress, totalAmount);
+      `INSERT INTO orders (id, order_no, user_id, recipient_name, recipient_email, recipient_address, total_amount, merchant_trade_no)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(orderId, orderNo, userId, recipientName, recipientEmail, recipientAddress, totalAmount, merchantTradeNo);
 
     const insertItem = db.prepare(
       `INSERT INTO order_items (id, order_id, product_id, product_name, product_price, quantity)
@@ -167,6 +171,7 @@ router.post('/', (req, res) => {
     data: {
       id: order.id,
       order_no: order.order_no,
+      merchant_trade_no: order.merchant_trade_no,
       total_amount: order.total_amount,
       status: order.status,
       items: orderItems,
@@ -227,6 +232,19 @@ router.get('/', (req, res) => {
     error: null,
     message: '成功'
   });
+});
+
+// Must be before /:id to avoid being swallowed by the wildcard route
+router.get('/by-trade-no/:merchantTradeNo', (req, res) => {
+  const order = db.prepare(
+    'SELECT id FROM orders WHERE merchant_trade_no = ? AND user_id = ?'
+  ).get(req.params.merchantTradeNo, req.user.userId);
+
+  if (!order) {
+    return res.status(404).json({ data: null, error: 'NOT_FOUND', message: '訂單不存在' });
+  }
+
+  res.json({ data: { id: order.id }, error: null, message: '成功' });
 });
 
 /**
@@ -413,6 +431,47 @@ router.patch('/:id/pay', (req, res) => {
     error: null,
     message: action === 'success' ? '付款成功' : '付款失敗'
   });
+});
+
+// Verify payment status via ECPay QueryTradeInfo
+router.post('/:id/verify', async (req, res) => {
+  const order = db.prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?').get(req.params.id, req.user.userId);
+  if (!order) {
+    return res.status(404).json({ data: null, error: 'NOT_FOUND', message: '訂單不存在' });
+  }
+
+  if (order.status !== 'pending') {
+    const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
+    return res.json({ data: { ...order, items }, error: null, message: '訂單狀態已確認' });
+  }
+
+  if (!order.merchant_trade_no) {
+    return res.status(400).json({ data: null, error: 'INVALID_STATE', message: '此訂單尚未發起付款' });
+  }
+
+  try {
+    const tradeInfo = await ecpay.queryTradeInfo(order.merchant_trade_no);
+
+    let newStatus = order.status;
+    if (tradeInfo.TradeStatus === '1') {
+      newStatus = 'paid';
+    } else if (tradeInfo.TradeStatus === '10200095') {
+      newStatus = 'failed';
+    }
+
+    if (newStatus !== order.status) {
+      db.prepare('UPDATE orders SET status = ?, ecpay_trade_no = ? WHERE id = ?')
+        .run(newStatus, tradeInfo.TradeNo || '', order.id);
+    }
+
+    const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+    const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
+
+    const message = newStatus === 'paid' ? '付款成功' : '尚未付款，請完成付款後再查詢';
+    return res.json({ data: { ...updated, items }, error: null, message });
+  } catch (err) {
+    return res.status(500).json({ data: null, error: 'ECPAY_ERROR', message: '查詢付款狀態失敗，請稍後再試' });
+  }
 });
 
 module.exports = router;

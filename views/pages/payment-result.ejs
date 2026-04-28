@@ -1,0 +1,45 @@
+<div id="app" data-trade-no="<%= merchantTradeNo %>">
+  <div class="max-w-md mx-auto py-12 text-center">
+    <div v-if="status === 'loading'">
+      <div class="w-12 h-12 border-4 border-rose-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+      <p class="text-text-secondary">正在確認付款狀態，請稍候...</p>
+    </div>
+
+    <div v-else-if="status === 'paid'" class="bg-sage/10 border border-sage/20 rounded-2xl p-8">
+      <div class="text-4xl mb-4">✓</div>
+      <h2 class="text-xl font-bold text-sage mb-2">付款成功！</h2>
+      <p class="text-text-secondary text-sm mb-6">感謝您的購買，訂單已確認。</p>
+      <a :href="orderUrl" class="inline-block bg-sage text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-sage/90 transition-colors">
+        查看訂單
+      </a>
+    </div>
+
+    <div v-else-if="status === 'pending'" class="bg-apricot/10 border border-apricot/20 rounded-2xl p-8">
+      <div class="text-4xl mb-4">⏳</div>
+      <h2 class="text-xl font-bold text-apricot mb-2">尚未完成付款</h2>
+      <p class="text-text-secondary text-sm mb-6">綠界尚未收到付款，若已完成付款請稍後再查詢。</p>
+      <div class="flex gap-3 justify-center">
+        <button @click="verify" class="bg-apricot text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-apricot/90 transition-colors">
+          重新查詢
+        </button>
+        <a :href="orderUrl" class="border border-gray-200 text-text-secondary px-6 py-2 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors">
+          查看訂單
+        </a>
+      </div>
+    </div>
+
+    <div v-else-if="status === 'failed'" class="bg-red-50 border border-red-100 rounded-2xl p-8">
+      <div class="text-4xl mb-4">✕</div>
+      <h2 class="text-xl font-bold text-red-600 mb-2">付款失敗</h2>
+      <p class="text-text-secondary text-sm mb-6">付款未成功完成，請返回訂單頁面重試。</p>
+      <a :href="orderUrl" class="inline-block bg-red-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-red-600 transition-colors">
+        返回訂單
+      </a>
+    </div>
+
+    <div v-else class="bg-gray-50 border border-gray-200 rounded-2xl p-8">
+      <p class="text-text-secondary text-sm mb-4">{{ errorMsg }}</p>
+      <a href="/orders" class="text-rose-primary text-sm underline">查看所有訂單</a>
+    </div>
+  </div>
+</div>
