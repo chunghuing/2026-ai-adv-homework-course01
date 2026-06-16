@@ -129,6 +129,10 @@ npm start
 | `/api/admin/products` | DELETE | `/:id` | JWT + admin | 刪除商品 |
 | `/api/admin/orders` | GET | `/` | JWT + admin | 後台訂單列表 |
 | `/api/admin/orders` | GET | `/:id` | JWT + admin | 後台訂單詳情 |
+| `/payment` | POST | `/ecpay/:orderId/params` | JWT | 取得 ECPay 付款參數 |
+| `/payment` | POST | `/notify` | — | 綠界 S2S 付款通知（ReturnURL） |
+| `/payment` | GET/POST | `/result` | — | 付款結果頁（OrderResultURL） |
+| `/api/orders` | POST | `/:id/verify` | JWT | 查詢 ECPay 付款狀態 |
 
 > 「雙模式」= 優先 `Authorization: Bearer <token>`，其次 `X-Session-Id: <uuid>`
 
@@ -234,7 +238,11 @@ npm start
 | recipient_address | TEXT | NOT NULL |
 | total_amount | INTEGER | NOT NULL |
 | status | TEXT | NOT NULL、DEFAULT 'pending'、CHECK IN ('pending', 'paid', 'failed') |
+| merchant_trade_no | TEXT | 可 NULL（綠界特店交易編號，格式：`FLR{timestamp}{random7}`，最長 20 碼） |
+| ecpay_trade_no | TEXT | 可 NULL（綠界回傳的交易序號，付款成功後寫入） |
 | created_at | TEXT | NOT NULL、DEFAULT datetime('now') |
+
+> `merchant_trade_no` 與 `ecpay_trade_no` 為 migration 欄位（`runMigrations()` 以 `ALTER TABLE` 補加）
 
 ### order_items
 

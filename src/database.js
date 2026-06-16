@@ -167,6 +167,7 @@ function runMigrations() {
   // ECPay columns: SQLite does not support IF NOT EXISTS for ALTER TABLE
   try { db.exec('ALTER TABLE orders ADD COLUMN merchant_trade_no TEXT'); } catch (_) {}
   try { db.exec('ALTER TABLE orders ADD COLUMN ecpay_trade_no TEXT'); } catch (_) {}
+  try { db.exec('ALTER TABLE orders ADD COLUMN payment_method TEXT'); } catch (_) {}
 }
 
 initializeDatabase();

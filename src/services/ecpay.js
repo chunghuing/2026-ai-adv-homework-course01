@@ -74,7 +74,7 @@ function buildPaymentParams(order, baseUrl) {
     ItemName: itemName,
     ReturnURL: `${baseUrl}/payment/notify`,
     OrderResultURL: `${baseUrl}/payment/result`,
-    ChoosePayment: 'Credit',
+    ChoosePayment: 'ALL',
     EncryptType: '1',
   };
 

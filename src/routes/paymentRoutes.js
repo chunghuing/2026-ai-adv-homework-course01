@@ -33,6 +33,21 @@ router.post('/ecpay/:orderId/params', authMiddleware, (req, res) => {
 // ReturnURL: S2S notification from ECPay (may not be reachable on localhost)
 // Must respond with exactly "1|OK" (HTTP 200) within 10 seconds
 router.post('/notify', express.urlencoded({ extended: false }), (req, res) => {
+  const params = req.body;
+
+  if (!ecpay.verifyCheckMacValue(params)) {
+    return res.status(200).type('text/plain').send('0|Error');
+  }
+
+  const { MerchantTradeNo, RtnCode, TradeNo } = params;
+  if (RtnCode === '1') {
+    const order = db.prepare('SELECT id, status FROM orders WHERE merchant_trade_no = ?').get(MerchantTradeNo);
+    if (order && order.status === 'pending') {
+      db.prepare('UPDATE orders SET status = ?, ecpay_trade_no = ? WHERE id = ?')
+        .run('paid', TradeNo || '', order.id);
+    }
+  }
+
   res.status(200).type('text/plain').send('1|OK');
 });
 

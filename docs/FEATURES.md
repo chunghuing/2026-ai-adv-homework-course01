@@ -11,7 +11,7 @@
 | 模擬付款 | ✅ 完成 |
 | 後台商品管理 | ✅ 完成 |
 | 後台訂單管理 | ✅ 完成 |
-| 綠界金流整合 | ⏳ 待開發（環境變數已預留） |
+| 綠界金流整合（AIO） | ✅ 完成 |
 
 ---
 
@@ -199,7 +199,48 @@ ORD-{YYYYMMDD}-{UUID v4 前 5 碼大寫}
 
 ---
 
-## 6. 後台訂單管理（需 JWT + admin role）
+## 6. 綠界金流整合（AIO）
+
+### 行為描述
+
+**取得付款參數**（`POST /payment/ecpay/:orderId/params`）：
+- 需 JWT；確認訂單屬於當前使用者且 `status = 'pending'`
+- 回傳 ECPay AIO 所需的 `paymentUrl`（URL）與 `params`（含 CheckMacValue 的表單欄位）
+- 前端收到後自動建立 form 並 submit，瀏覽器跳轉至綠界付款頁
+
+**付款方式**：
+- `ChoosePayment: 'ALL'` — 綠界付款頁同時顯示所有已開通方式，由消費者選擇
+- 支援項目（依代收付模式合約）：信用卡、ATM 轉帳、超商代碼、超商條碼、WebATM 等
+
+**付款結果接收**：
+- `POST /payment/notify`（ReturnURL）：接收綠界 S2S 通知，必須在 10 秒內回應 `1|OK`
+- `GET|POST /payment/result`（OrderResultURL）：消費者付款後瀏覽器導向，渲染付款結果頁
+
+**付款狀態查詢**（`POST /api/orders/:id/verify`）：
+- 呼叫 ECPay `QueryTradeInfo` API 查詢最新付款狀態
+- `TradeStatus=1` → 訂單更新為 `paid`；`TradeStatus=10200095` → 更新為 `failed`
+- 訂單已非 `pending` 時直接回傳現有狀態，不再查詢
+
+### CheckMacValue 簽章
+
+使用 SHA-256 + ECPay 專屬 URL encode 規則（`ecpayUrlEncode`）：
+- 參數按鍵名小寫字母排序後串接
+- 前後分別加 `HashKey=...` 與 `HashIV=...`
+- 整串 URL encode 後取 SHA-256，結果轉大寫
+
+### 環境變數
+
+| 變數 | 說明 | 預設值（測試） |
+|------|------|--------------|
+| `ECPAY_MERCHANT_ID` | 特店編號 | `3002607` |
+| `ECPAY_HASH_KEY` | HashKey | `pwFHCqoQZGmho4w6` |
+| `ECPAY_HASH_IV` | HashIV | `EkRm7iFT261dpevs` |
+| `ECPAY_ENV` | 設為 `production` 切換正式環境 | （空，使用 stage） |
+| `BASE_URL` | ReturnURL / OrderResultURL 的 domain | `http://localhost:3001` |
+
+---
+
+## 7. 後台訂單管理（需 JWT + admin role）
 
 ### 行為描述
 
